@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Area, AreaChart } from 'recharts';
 import { realChargingData } from './realChargingData';
 
@@ -42,7 +42,6 @@ const TeslaChargingCalculator = () => {
   const [startSOC, setStartSOC] = useState(20);
   const [endSOC, setEndSOC] = useState(80);
   const [maxPower, setMaxPower] = useState(250);
-  const [results, setResults] = useState(null);
 
   // Interpolazione lineare per ottenere la potenza a qualsiasi SOC
   const interpolatePower = (soc) => {
@@ -381,7 +380,7 @@ const TeslaChargingCalculator = () => {
                   {/* Curva tratteggiata: massima potenza reale */}
                   <Area 
                     type="monotone" 
-                    dataKey="socMax" 
+                    dataKey="socMax"
                     stroke="#f59e42"
                     strokeWidth={2}
                     fill="none"
@@ -393,8 +392,8 @@ const TeslaChargingCalculator = () => {
                   {/* Curva piena: potenza limitata */}
                   <Area 
                     type="monotone" 
-                    dataKey="socLimited" 
-                    stroke="#8b5cf6" 
+                    dataKey="socLimited"
+                    stroke="#8b5cf6"
                     strokeWidth={3}
                     fill="url(#colorGradient)"
                     name="SOC potenza selezionata"
@@ -417,23 +416,6 @@ const TeslaChargingCalculator = () => {
                 </div>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Informazioni tecniche */}
-        <div className="mt-8 bg-gradient-to-r from-gray-50 to-gray-100 p-6 rounded-xl">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">ℹ️ Informazioni Tecniche</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
-            <div>
-              <strong>Capacità Batteria:</strong> 82 kWh (nominale)<br/>
-              <strong>Potenza Max Reale:</strong> 189 kW (dai dati)<br/>
-              <strong>Tipo di Ricarica:</strong> DC Fast Charging
-            </div>
-            <div>
-              <strong>Algoritmo:</strong> Interpolazione lineare dei dati reali<br/>
-              <strong>Precisione:</strong> Calcolo per passi di 0.5%<br/>
-              <strong>Fonte Dati:</strong> Sessione di ricarica reale 14%-100%
-            </div>
           </div>
         </div>
       </div>
