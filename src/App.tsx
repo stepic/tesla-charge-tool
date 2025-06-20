@@ -1,46 +1,48 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Area, AreaChart } from 'recharts';
+import { realChargingData } from './realChargingData';
 
 document.title = 'Tesla Charging Calculator';
+
+// Funzione di utilità per convertire hh:mm:ss in minuti
+function timeToMinutes(timeStr: string): number {
+  const [h, m, s] = timeStr.split(':').map(Number);
+  return h * 60 + m + s / 60;
+}
+
+// Interpolazione lineare tra due punti dati
+function interpolateField(soc: number, field: keyof typeof realChargingData[0]) {
+  const lower = realChargingData.slice().reverse().find((p) => p.soc <= soc);
+  const upper = realChargingData.find((p) => p.soc >= soc);
+  if (field === 'time') {
+    // Restituisci sempre minuti
+    if (!lower && upper) return timeToMinutes(upper.time);
+    if (!upper && lower) return timeToMinutes(lower.time);
+    if (lower && upper && lower.soc === upper.soc) return timeToMinutes(lower.time);
+    if (lower && upper) {
+      const ratio = (soc - lower.soc) / (upper.soc - lower.soc);
+      const lowerMin = timeToMinutes(lower.time);
+      const upperMin = timeToMinutes(upper.time);
+      return lowerMin + ratio * (upperMin - lowerMin);
+    }
+    return 0;
+  }
+  // Per altri campi
+  if (!lower) return upper ? upper[field] : 0;
+  if (!upper) return lower[field];
+  if (lower.soc === upper.soc) return lower[field];
+  const ratio = (soc - lower.soc) / (upper.soc - lower.soc);
+  if (typeof lower[field] === 'number' && typeof upper[field] === 'number') {
+    return (lower[field] as number) + ratio * ((upper[field] as number) - (lower[field] as number));
+  }
+  return lower[field];
+}
 
 const TeslaChargingCalculator = () => {
   const [startSOC, setStartSOC] = useState(20);
   const [endSOC, setEndSOC] = useState(80);
   const [maxPower, setMaxPower] = useState(250);
   const [results, setResults] = useState(null);
-
-  // Dati reali dalla sessione di ricarica (curva di ricarica Tesla Model Y)
-  const realChargingData = [
-    { soc: 14, avgPower: 189 }, { soc: 15, avgPower: 187 }, { soc: 16, avgPower: 185 },
-    { soc: 17, avgPower: 187 }, { soc: 18, avgPower: 187 }, { soc: 19, avgPower: 188 },
-    { soc: 20, avgPower: 188 }, { soc: 21, avgPower: 189 }, { soc: 22, avgPower: 189 },
-    { soc: 23, avgPower: 174 }, { soc: 24, avgPower: 164 }, { soc: 25, avgPower: 166 },
-    { soc: 26, avgPower: 166 }, { soc: 27, avgPower: 165 }, { soc: 28, avgPower: 165 },
-    { soc: 29, avgPower: 167 }, { soc: 30, avgPower: 167 }, { soc: 31, avgPower: 164 },
-    { soc: 32, avgPower: 161 }, { soc: 33, avgPower: 158 }, { soc: 34, avgPower: 156 },
-    { soc: 35, avgPower: 154 }, { soc: 36, avgPower: 151 }, { soc: 37, avgPower: 147 },
-    { soc: 38, avgPower: 144 }, { soc: 39, avgPower: 142 }, { soc: 40, avgPower: 139 },
-    { soc: 41, avgPower: 137 }, { soc: 42, avgPower: 134 }, { soc: 43, avgPower: 122 },
-    { soc: 44, avgPower: 123 }, { soc: 45, avgPower: 121 }, { soc: 46, avgPower: 116 },
-    { soc: 47, avgPower: 112 }, { soc: 48, avgPower: 107 }, { soc: 49, avgPower: 104 },
-    { soc: 50, avgPower: 102 }, { soc: 51, avgPower: 98 }, { soc: 52, avgPower: 95 },
-    { soc: 53, avgPower: 92 }, { soc: 54, avgPower: 89 }, { soc: 55, avgPower: 87 },
-    { soc: 56, avgPower: 86 }, { soc: 57, avgPower: 85 }, { soc: 58, avgPower: 83 },
-    { soc: 59, avgPower: 82 }, { soc: 60, avgPower: 82 }, { soc: 61, avgPower: 80 },
-    { soc: 62, avgPower: 79 }, { soc: 63, avgPower: 78 }, { soc: 64, avgPower: 77 },
-    { soc: 65, avgPower: 76 }, { soc: 66, avgPower: 74 }, { soc: 67, avgPower: 73 },
-    { soc: 68, avgPower: 73 }, { soc: 69, avgPower: 73 }, { soc: 70, avgPower: 73 },
-    { soc: 71, avgPower: 73 }, { soc: 72, avgPower: 73 }, { soc: 73, avgPower: 72 },
-    { soc: 74, avgPower: 71 }, { soc: 75, avgPower: 69 }, { soc: 76, avgPower: 67 },
-    { soc: 77, avgPower: 64 }, { soc: 78, avgPower: 58 }, { soc: 79, avgPower: 57 },
-    { soc: 80, avgPower: 54 }, { soc: 81, avgPower: 51 }, { soc: 82, avgPower: 49 },
-    { soc: 83, avgPower: 47 }, { soc: 84, avgPower: 45 }, { soc: 85, avgPower: 44 },
-    { soc: 86, avgPower: 42 }, { soc: 87, avgPower: 42 }, { soc: 88, avgPower: 39 },
-    { soc: 89, avgPower: 38 }, { soc: 90, avgPower: 37 }, { soc: 91, avgPower: 35 },
-    { soc: 92, avgPower: 33 }, { soc: 93, avgPower: 32 }, { soc: 94, avgPower: 30 },
-    { soc: 95, avgPower: 27 }, { soc: 96, avgPower: 25 }, { soc: 97, avgPower: 23 },
-    { soc: 98, avgPower: 20 }, { soc: 99, avgPower: 15 }, { soc: 100, avgPower: 13 }
-  ];
 
   // Interpolazione lineare per ottenere la potenza a qualsiasi SOC
   const interpolatePower = (soc) => {
@@ -59,46 +61,107 @@ const TeslaChargingCalculator = () => {
     return Math.min(maxPower, interpolatedPower);
   };
 
-  // Calcolo del tempo di ricarica
+  // Calcolo del tempo di ricarica e profilo usando i dati reali
   const calculateChargingTime = useMemo(() => {
     if (startSOC >= endSOC) return null;
 
-    const batteryCapacity = 82; // kWh per Tesla Model Y AWD
-    const stepSize = 0.5; // Passi di 0.5% per maggiore precisione
-    let totalTime = 0;
     let chargingProfile: { soc: number; time: number; power: number; timeHours: number }[] = [];
-    
-    for (let currentSOC = startSOC; currentSOC < endSOC; currentSOC += stepSize) {
-      const power = interpolatePower(currentSOC);
-      const energyNeeded = (batteryCapacity * stepSize) / 100; // kWh per questo step
-      const timeForStep = (energyNeeded / power) * 60; // minuti
-      
-      totalTime += timeForStep;
-      
-      // Aggiungi punto al profilo ogni 1%
-      if (currentSOC % 1 === 0) {
-        chargingProfile.push({
-          soc: Math.round(currentSOC),
-          time: totalTime,
-          power: power,
-          timeHours: totalTime / 60
+    let totalTime = 0;
+    let prevEnergy = interpolateField(startSOC, 'energy') as number;
+
+    for (let soc = startSOC + 1; soc <= endSOC; soc += 1) {
+      const currEnergy = interpolateField(soc, 'energy') as number;
+      const energyStep = currEnergy - prevEnergy; // kWh da caricare in questo step
+      let power = interpolateField(soc, 'avgPower') as number;
+      power = Math.min(power, maxPower); // limita la potenza
+      const timeStep = power > 0 ? (energyStep / power) * 60 : 0; // minuti
+      totalTime += timeStep;
+      chargingProfile.push({
+        soc: Math.round(soc),
+        time: totalTime,
+        power: power,
+        timeHours: totalTime / 60
+      });
+      prevEnergy = currEnergy;
+    }
+
+    chargingProfile.unshift({
+      soc: Math.round(startSOC),
+      time: 0,
+      power: Math.min(interpolateField(startSOC, 'avgPower') as number, maxPower),
+      timeHours: 0
+    });
+
+    // Calcola anche il profilo alla massima potenza reale (senza limitazione maxPower)
+    let chargingProfileMaxPower: { soc: number; time: number; power: number; timeHours: number }[] = [];
+    let totalTimeMax = 0;
+    let prevEnergyMax = interpolateField(startSOC, 'energy') as number;
+    for (let soc = startSOC + 1; soc <= endSOC; soc += 1) {
+      const currEnergy = interpolateField(soc, 'energy') as number;
+      const energyStep = currEnergy - prevEnergyMax;
+      let power = interpolateField(soc, 'avgPower') as number;
+      const timeStep = power > 0 ? (energyStep / power) * 60 : 0;
+      totalTimeMax += timeStep;
+      chargingProfileMaxPower.push({
+        soc: Math.round(soc),
+        time: totalTimeMax,
+        power: power,
+        timeHours: totalTimeMax / 60
+      });
+      prevEnergyMax = currEnergy;
+    }
+    chargingProfileMaxPower.unshift({
+      soc: Math.round(startSOC),
+      time: 0,
+      power: interpolateField(startSOC, 'avgPower') as number,
+      timeHours: 0
+    });
+
+    // Crea un array dati combinato per il grafico, con tempo come asse X
+    // Per ogni step, abbina i valori di SOC per maxPower e per potenza limitata
+    let combinedProfile: { time: number; socLimited: number; socMax: number }[] = [];
+    let i = 0, j = 0;
+    while (i < chargingProfile.length || j < chargingProfileMaxPower.length) {
+      const tLimited = chargingProfile[i]?.time ?? Infinity;
+      const tMax = chargingProfileMaxPower[j]?.time ?? Infinity;
+      if (tLimited < tMax) {
+        combinedProfile.push({
+          time: tLimited,
+          socLimited: chargingProfile[i].soc,
+          socMax: chargingProfileMaxPower[j > 0 ? j - 1 : 0]?.soc ?? chargingProfileMaxPower[0].soc
         });
+        i++;
+      } else if (tMax < tLimited) {
+        combinedProfile.push({
+          time: tMax,
+          socLimited: chargingProfile[i > 0 ? i - 1 : 0]?.soc ?? chargingProfile[0].soc,
+          socMax: chargingProfileMaxPower[j].soc
+        });
+        j++;
+      } else if (tLimited === tMax && tLimited !== Infinity) {
+        combinedProfile.push({
+          time: tLimited,
+          socLimited: chargingProfile[i].soc,
+          socMax: chargingProfileMaxPower[j].soc
+        });
+        i++;
+        j++;
+      } else {
+        break;
       }
     }
 
-    // Aggiungi il punto finale
-    chargingProfile.push({
-      soc: endSOC,
-      time: totalTime,
-      power: interpolatePower(endSOC),
-      timeHours: totalTime / 60
-    });
+    const energyStart = interpolateField(startSOC, 'energy') as number;
+    const energyEnd = interpolateField(endSOC, 'energy') as number;
+    const energyAdded = energyEnd - energyStart;
 
     return {
       totalTimeMinutes: totalTime,
       totalTimeHours: totalTime / 60,
-      chargingProfile: chargingProfile,
-      energyAdded: (batteryCapacity * (endSOC - startSOC)) / 100
+      chargingProfile,
+      chargingProfileMaxPower,
+      combinedProfile,
+      energyAdded
     };
   }, [startSOC, endSOC, maxPower]);
 
@@ -113,12 +176,14 @@ const TeslaChargingCalculator = () => {
     }
   };
 
-  // Dati per il grafico della curva di potenza
-  const powerCurveData = realChargingData.map(point => ({
-    soc: point.soc,
-    power: Math.min(maxPower, point.avgPower),
-    originalPower: point.avgPower
-  }));
+  // Dati per il grafico della curva di potenza (limitati all'intervallo selezionato)
+  const powerCurveData = realChargingData
+    .filter(point => point.soc >= startSOC && point.soc <= endSOC)
+    .map(point => ({
+      soc: point.soc,
+      power: Math.min(maxPower, point.avgPower),
+      originalPower: point.avgPower
+    }));
 
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
@@ -179,7 +244,7 @@ const TeslaChargingCalculator = () => {
               <input
                 type="range"
                 min="1"
-                max="189"
+                max="250"
                 value={maxPower}
                 onChange={(e) => setMaxPower(Number(e.target.value))}
                 className="flex-1 h-2 bg-red-200 rounded-lg appearance-none cursor-pointer"
@@ -188,7 +253,7 @@ const TeslaChargingCalculator = () => {
                 type="number"
                 value={maxPower}
                 min="1"
-                max="189"
+                max="250"
                 onChange={(e) => setMaxPower(Number(e.target.value))}
                 className="text-2xl font-bold text-red-700 min-w-[70px]"
                 style={{ width: 60, marginLeft: 8 }}
@@ -249,7 +314,7 @@ const TeslaChargingCalculator = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
                 <XAxis 
                   dataKey="soc" 
-                  domain={[14, 100]}
+                  domain={[startSOC, endSOC]}
                   type="number"
                   label={{ value: 'SOC (%)', position: 'insideBottom', offset: -5 }}
                 />
@@ -298,7 +363,7 @@ const TeslaChargingCalculator = () => {
             </h3>
             {calculateChargingTime && startSOC < endSOC ? (
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={calculateChargingTime.chargingProfile}>
+                <AreaChart data={calculateChargingTime.combinedProfile}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
                   <XAxis 
                     dataKey="time" 
@@ -310,15 +375,31 @@ const TeslaChargingCalculator = () => {
                     label={{ value: 'SOC (%)', angle: -90, position: 'insideLeft' }}
                   />
                   <Tooltip 
-                    formatter={(value) => [`${value}%`, 'SOC']}
+                    formatter={(value, name) => [`${value}%`, name === 'socMax' ? 'SOC max potenza' : 'SOC potenza selezionata']}
                     labelFormatter={(value) => `Tempo: ${formatTime(value)}`}
                   />
+                  {/* Curva tratteggiata: massima potenza reale */}
                   <Area 
                     type="monotone" 
-                    dataKey="soc" 
+                    dataKey="socMax" 
+                    stroke="#f59e42"
+                    strokeWidth={2}
+                    fill="none"
+                    strokeDasharray="6 6"
+                    name="SOC max potenza"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  {/* Curva piena: potenza limitata */}
+                  <Area 
+                    type="monotone" 
+                    dataKey="socLimited" 
                     stroke="#8b5cf6" 
                     strokeWidth={3}
                     fill="url(#colorGradient)"
+                    name="SOC potenza selezionata"
+                    dot={false}
+                    isAnimationActive={false}
                   />
                   <defs>
                     <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
@@ -344,7 +425,7 @@ const TeslaChargingCalculator = () => {
           <h3 className="text-lg font-semibold text-gray-800 mb-3">ℹ️ Informazioni Tecniche</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
             <div>
-              <strong>Capacità Batteria:</strong> 78.1 kWh (nominale)<br/>
+              <strong>Capacità Batteria:</strong> 82 kWh (nominale)<br/>
               <strong>Potenza Max Reale:</strong> 189 kW (dai dati)<br/>
               <strong>Tipo di Ricarica:</strong> DC Fast Charging
             </div>
