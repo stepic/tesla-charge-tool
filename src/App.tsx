@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Area, AreaChart } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Area, AreaChart, ReferenceDot } from 'recharts';
 import { realChargingData } from './realChargingData';
 import Papa from 'papaparse';
 
@@ -45,6 +45,7 @@ const TeslaChargingCalculator = () => {
   const [maxPower, setMaxPower] = useState(250);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvInfo, setCsvInfo] = useState<{minSOC: number, maxSOC: number, maxPower: number} | null>(null);
+  const [csvCurveData, setCsvCurveData] = useState<{ soc: number, power: number }[] | null>(null);
 
   // Parsing CSV e aggiornamento stati
   const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,7 +64,7 @@ const TeslaChargingCalculator = () => {
           return Number(socStr);
         }).filter(n => !isNaN(n));
         const powers = data.map(row => {
-          const pStr = (row['Power'] || row['Potenza'] || '').replace('kW','').replace('kW','').replace(',','.').trim();
+          const pStr = (row['Power'] || row['Potenza'] || '').replace('kW','').replace(',','.').trim();
           return Number(pStr);
         }).filter(n => !isNaN(n));
         if (socs.length && powers.length) {
@@ -74,6 +75,13 @@ const TeslaChargingCalculator = () => {
           setEndSOC(maxSOC);
           setMaxPower(Math.round(maxPwr));
           setCsvInfo({minSOC, maxSOC, maxPower: Math.round(maxPwr)});
+          // Prepara dati per curva CSV
+          const csvData = data.map(row => {
+            const soc = Number((row['SOC'] || row['Soc'] || '').replace('%','').trim());
+            const power = Number((row['Power'] || row['Potenza'] || '').replace('kW','').replace(',','.').trim());
+            return (!isNaN(soc) && !isNaN(power)) ? { soc, power } : null;
+          }).filter(Boolean) as { soc: number, power: number }[];
+          setCsvCurveData(csvData);
         }
       }
     });
@@ -223,23 +231,6 @@ const TeslaChargingCalculator = () => {
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
       <div className="bg-white rounded-2xl shadow-xl p-8">
-        {/* Upload CSV */}
-        <div className="mb-8 flex flex-col items-center">
-          <label className="mb-2 font-semibold text-gray-700">Carica file CSV di ricarica</label>
-          <input
-            type="file"
-            accept=".csv"
-            onChange={handleCsvUpload}
-            className="mb-2"
-          />
-          {csvInfo && (
-            <div className="text-sm text-gray-600">
-              SOC rilevati: <b>{csvInfo.minSOC}%</b> - <b>{csvInfo.maxSOC}%</b> &nbsp; | &nbsp;
-              Potenza max: <b>{csvInfo.maxPower} kW</b>
-            </div>
-          )}
-        </div>
-
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
             🚗⚡ Tesla Model Y Juniper AWD
@@ -247,6 +238,42 @@ const TeslaChargingCalculator = () => {
           <p className="text-xl text-gray-600">Calcolatore Tempo di Ricarica</p>
           <p className="text-sm text-gray-500 mt-2">Basato su dati reali di ricarica</p>
         </div>
+
+        {/* Upload CSV migliorato */}
+        <div className="flex flex-col items-center mb-10">
+          <label
+            htmlFor="csv-upload"
+            className="cursor-pointer px-6 py-3 rounded-lg bg-gradient-to-r from-blue-400 to-indigo-500 text-white font-semibold shadow-md hover:from-blue-500 hover:to-indigo-600 transition mb-2"
+          >
+            📄 Carica file CSV di ricarica
+          </label>
+          <input
+            id="csv-upload"
+            type="file"
+            accept=".csv"
+            onChange={handleCsvUpload}
+            className="hidden"
+          />
+          {csvInfo && (
+            <div className="text-sm text-gray-700 mt-2 bg-blue-50 px-4 py-2 rounded-lg shadow-inner">
+              <span className="mr-2">SOC rilevati: <b>{csvInfo.minSOC}%</b> - <b>{csvInfo.maxSOC}%</b></span>
+              <span className="mx-2">|</span>
+              <span>Potenza max: <b>{csvInfo.maxPower} kW</b></span>
+              <button
+                className="ml-4 px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition text-xs font-semibold"
+                onClick={() => {
+                  setCsvFile(null);
+                  setCsvInfo(null);
+                  setCsvCurveData(null);
+                }}
+              >
+                Rimuovi CSV
+              </button>
+            </div>
+          )}
+          <div className="text-xs text-gray-400 mt-1">Accetta file CSV con colonne SOC e Power/Potenza</div>
+        </div>
+        {/* Fine upload CSV migliorato */}
 
         {/* Controlli */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -380,7 +407,8 @@ const TeslaChargingCalculator = () => {
                 <Tooltip 
                   formatter={(value, name) => [
                     `${(Number(value)).toFixed(1)} kW`, 
-                    name === 'power' ? 'Potenza Limitata' : 'Potenza Originale'
+                    name === 'power' ? 'Potenza Limitata' : 
+                    name === 'csvPower' ? 'Potenza CSV' : 'Potenza Originale'
                   ]}
                   labelFormatter={(value) => `SOC: ${value}%`}
                 />
@@ -402,6 +430,21 @@ const TeslaChargingCalculator = () => {
                   name="Potenza Applicata"
                   dot={false}
                 />
+                {/* Curva CSV sovrapposta */}
+                {csvCurveData && csvCurveData.length > 0 && (
+                  <Line
+                    type="monotone"
+                    data={csvCurveData}
+                    dataKey="power"
+                    xAxisId={0}
+                    yAxisId={0}
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    name="Potenza CSV"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                )}
                 {startSOC < endSOC && (
                   <>
                     <ReferenceLine x={startSOC} stroke="#10b981" strokeWidth={2} strokeDasharray="8 8" />
@@ -418,55 +461,141 @@ const TeslaChargingCalculator = () => {
               ⏱️ Progresso di Ricarica - SOC vs Tempo
             </h3>
             {calculateChargingTime && startSOC < endSOC ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={calculateChargingTime.combinedProfile}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
-                  <XAxis 
-                    dataKey="time" 
-                    label={{ value: 'Tempo (min)', position: 'insideBottom', offset: -5 }}
-                    tickFormatter={(value) => value < 60 ? `${Math.round(value)}min` : `${Math.round(value/60)}h`}
-                  />
-                  <YAxis 
-                    domain={[startSOC, endSOC]}
-                    label={{ value: 'SOC (%)', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip 
-                    formatter={(value, name) => [`${value}%`, name === 'socMax' ? 'SOC max potenza' : 'SOC potenza selezionata']}
-                    labelFormatter={(value) => `Tempo: ${formatTime(value)}`}
-                  />
-                  {/* Curva tratteggiata: massima potenza reale */}
-                                                    <Area 
-                                                      type="monotone" 
-                                                      dataKey="socMax"
-                                                      stroke="#6366f1"
-                                                      fill="#6366f1"
-                                                      fillOpacity={0.15}
-                                                      strokeDasharray="5 5"
-                                                      name="SOC max potenza"
-                                                      dot={false}
-                                                    />
-                                                    <Area 
-                                                      type="monotone" 
-                                                      dataKey="socLimited"
-                                                      stroke="#3b82f6"
-                                                      fill="#3b82f6"
-                                                      fillOpacity={0.25}
-                                                      name="SOC potenza selezionata"
-                                                      dot={false}
-                                                    />
-                              </AreaChart>
-                            </ResponsiveContainer>
-                          ) : (
-                                              <div className="text-center text-gray-400 py-16">
-                                                Seleziona un intervallo di SOC valido per vedere il grafico.
-                                              </div>
-                                            )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  };
-                  
-                  export default TeslaChargingCalculator;
-       
+              <>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart
+                    data={calculateChargingTime.combinedProfile}
+                    layout="vertical"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
+                    <YAxis
+                      type="number"
+                      dataKey="time"
+                      domain={[0, calculateChargingTime.totalTimeMinutes]}
+                      label={{ value: 'Tempo (min)', angle: -90, position: 'insideLeft' }}
+                      tickFormatter={(value) => value < 60 ? `${Math.round(value)}min` : `${Math.round(value/60)}h`}
+                    />
+                    <XAxis
+                      type="number"
+                      dataKey="socLimited"
+                      domain={[startSOC, endSOC]}
+                      label={{ value: 'SOC (%)', position: 'insideBottom', offset: -5 }}
+                    />
+                    <Tooltip
+                      formatter={(value, name) => [`${value}%`, name === 'socMax' ? 'SOC max potenza' : 'SOC potenza selezionata']}
+                      labelFormatter={(value) => `Tempo: ${formatTime(value)}`}
+                    />
+                    {/* Curva tratteggiata: massima potenza reale */}
+                    <Area
+                      type="monotone"
+                      dataKey="socMax"
+                      stroke="#f59e42"
+                      fill="#f59e42"
+                      fillOpacity={0.15}
+                      strokeDasharray="5 5"
+                      name="SOC max potenza"
+                      dot={false}
+                      isAnimationActive={false}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="socLimited"
+                      stroke="#8b5cf6"
+                      fill="#8b5cf6"
+                      fillOpacity={0.25}
+                      name="SOC potenza selezionata"
+                      dot={false}
+                      isAnimationActive={false}
+                    />
+                    {/* Punto di arrivo max potenza reale */}
+                    {(() => {
+                      // Trova il punto in cui socMax raggiunge endSOC
+                      const arr = calculateChargingTime.combinedProfile;
+                      const idx = arr.findIndex(p => p.socMax >= endSOC);
+                      if (idx === -1) return null;
+                      const point = arr[idx];
+                      return (
+                        <ReferenceDot
+                          x={endSOC}
+                          y={point.time}
+                          r={7}
+                          fill="#f59e42"
+                          stroke="#fff"
+                          strokeWidth={2}
+                          label={{
+                            value: `Tmax: ${formatTime(point.time)}`,
+                            position: "left",
+                            fill: "#f59e42",
+                            fontWeight: 600,
+                            fontSize: 13,
+                            offset: 10
+                          }}
+                        />
+                      );
+                    })()}
+                    {/* Punto di arrivo potenza selezionata */}
+                    {(() => {
+                      // Trova il punto in cui socLimited raggiunge endSOC
+                      const arr = calculateChargingTime.combinedProfile;
+                      const idx = arr.findIndex(p => p.socLimited >= endSOC);
+                      if (idx === -1) return null;
+                      const point = arr[idx];
+                      // Label custom assoluta per posizionamento preciso
+                      return (
+                        <ReferenceDot
+                          x={endSOC}
+                          y={point.time}
+                          r={7}
+                          fill="#8b5cf6"
+                          stroke="#fff"
+                          strokeWidth={2}
+                          label={
+                            ({ viewBox }) => {
+                              // viewBox contiene {x, y} del punto
+                              // Sposta la label in alto e a sinistra rispetto al punto
+                              const x = viewBox.x - 100;
+                              const y = viewBox.y;
+                              return (
+                                <text
+                                  x={x}
+                                  y={y}
+                                  fill="#8b5cf6"
+                                  fontWeight={600}
+                                  fontSize={13}
+                                  style={{ pointerEvents: 'none' }}
+                                >
+                                  {`Tsel: ${formatTime(point.time)}`}
+                                </text>
+                              );
+                            }
+                          }
+                        />
+                      );
+                    })()}
+                  </AreaChart>
+                </ResponsiveContainer>
+                {/* Legenda custom */}
+                <div className="flex justify-center gap-6 mt-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-6 h-1 rounded bg-[#8b5cf6]"></span>
+                    <span>SOC potenza selezionata</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-6 h-1 rounded bg-[#f59e42]" style={{borderBottom: '2px dashed #f59e42'}}></span>
+                    <span>SOC max potenza reale</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center text-gray-400 py-16">
+                Seleziona un intervallo di SOC valido per vedere il grafico.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TeslaChargingCalculator;
