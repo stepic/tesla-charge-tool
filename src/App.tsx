@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Area, AreaChart } from 'recharts';
 import { realChargingData } from './realChargingData';
+import Papa from 'papaparse';
 
 document.title = 'Tesla Charging Calculator';
 
@@ -42,6 +43,41 @@ const TeslaChargingCalculator = () => {
   const [startSOC, setStartSOC] = useState(20);
   const [endSOC, setEndSOC] = useState(80);
   const [maxPower, setMaxPower] = useState(250);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvInfo, setCsvInfo] = useState<{minSOC: number, maxSOC: number, maxPower: number} | null>(null);
+
+  // Parsing CSV e aggiornamento stati
+  const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvFile(file);
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const data = results.data as any[];
+        // Estrai SOC e Potenza
+        const socs = data.map(row => {
+          const socStr = (row['SOC'] || row['Soc'] || '').replace('%','').trim();
+          return Number(socStr);
+        }).filter(n => !isNaN(n));
+        const powers = data.map(row => {
+          const pStr = (row['Power'] || row['Potenza'] || '').replace('kW','').replace('kW','').replace(',','.').trim();
+          return Number(pStr);
+        }).filter(n => !isNaN(n));
+        if (socs.length && powers.length) {
+          const minSOC = Math.min(...socs);
+          const maxSOC = Math.max(...socs);
+          const maxPwr = Math.max(...powers);
+          setStartSOC(minSOC);
+          setEndSOC(maxSOC);
+          setMaxPower(Math.round(maxPwr));
+          setCsvInfo({minSOC, maxSOC, maxPower: Math.round(maxPwr)});
+        }
+      }
+    });
+  };
 
   // Interpolazione lineare per ottenere la potenza a qualsiasi SOC
   const interpolatePower = (soc) => {
@@ -187,6 +223,23 @@ const TeslaChargingCalculator = () => {
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
       <div className="bg-white rounded-2xl shadow-xl p-8">
+        {/* Upload CSV */}
+        <div className="mb-8 flex flex-col items-center">
+          <label className="mb-2 font-semibold text-gray-700">Carica file CSV di ricarica</label>
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleCsvUpload}
+            className="mb-2"
+          />
+          {csvInfo && (
+            <div className="text-sm text-gray-600">
+              SOC rilevati: <b>{csvInfo.minSOC}%</b> - <b>{csvInfo.maxSOC}%</b> &nbsp; | &nbsp;
+              Potenza max: <b>{csvInfo.maxPower} kW</b>
+            </div>
+          )}
+        </div>
+
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
             🚗⚡ Tesla Model Y Juniper AWD
@@ -209,6 +262,7 @@ const TeslaChargingCalculator = () => {
                 value={startSOC}
                 onChange={(e) => setStartSOC(Number(e.target.value))}
                 className="flex-1 h-2 bg-green-200 rounded-lg appearance-none cursor-pointer"
+                disabled={!!csvInfo}
               />
               <span className="text-2xl font-bold text-green-700 min-w-[60px]">
                 {startSOC}%
@@ -228,6 +282,7 @@ const TeslaChargingCalculator = () => {
                 value={endSOC}
                 onChange={(e) => setEndSOC(Number(e.target.value))}
                 className="flex-1 h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer"
+                disabled={!!csvInfo}
               />
               <span className="text-2xl font-bold text-blue-700 min-w-[60px]">
                 {endSOC}%
@@ -247,6 +302,7 @@ const TeslaChargingCalculator = () => {
                 value={maxPower}
                 onChange={(e) => setMaxPower(Number(e.target.value))}
                 className="flex-1 h-2 bg-red-200 rounded-lg appearance-none cursor-pointer"
+                disabled={!!csvInfo}
               />
               <input
                 type="number"
@@ -256,6 +312,7 @@ const TeslaChargingCalculator = () => {
                 onChange={(e) => setMaxPower(Number(e.target.value))}
                 className="text-2xl font-bold text-red-700 min-w-[70px]"
                 style={{ width: 60, marginLeft: 8 }}
+                disabled={!!csvInfo}
               />
               <span className="text-2xl font-bold text-red-700 min-w-[70px]">
                 kW
@@ -378,49 +435,38 @@ const TeslaChargingCalculator = () => {
                     labelFormatter={(value) => `Tempo: ${formatTime(value)}`}
                   />
                   {/* Curva tratteggiata: massima potenza reale */}
-                  <Area 
-                    type="monotone" 
-                    dataKey="socMax"
-                    stroke="#f59e42"
-                    strokeWidth={2}
-                    fill="none"
-                    strokeDasharray="6 6"
-                    name="SOC max potenza"
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                  {/* Curva piena: potenza limitata */}
-                  <Area 
-                    type="monotone" 
-                    dataKey="socLimited"
-                    stroke="#8b5cf6"
-                    strokeWidth={3}
-                    fill="url(#colorGradient)"
-                    name="SOC potenza selezionata"
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                  <defs>
-                    <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
-                    </linearGradient>
-                  </defs>
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-gray-500">
-                <div className="text-center">
-                  <div className="text-4xl mb-2">📈</div>
-                  <div>Imposta SOC validi per vedere il progresso</div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default TeslaChargingCalculator;
+                                                    <Area 
+                                                      type="monotone" 
+                                                      dataKey="socMax"
+                                                      stroke="#6366f1"
+                                                      fill="#6366f1"
+                                                      fillOpacity={0.15}
+                                                      strokeDasharray="5 5"
+                                                      name="SOC max potenza"
+                                                      dot={false}
+                                                    />
+                                                    <Area 
+                                                      type="monotone" 
+                                                      dataKey="socLimited"
+                                                      stroke="#3b82f6"
+                                                      fill="#3b82f6"
+                                                      fillOpacity={0.25}
+                                                      name="SOC potenza selezionata"
+                                                      dot={false}
+                                                    />
+                              </AreaChart>
+                            </ResponsiveContainer>
+                          ) : (
+                                              <div className="text-center text-gray-400 py-16">
+                                                Seleziona un intervallo di SOC valido per vedere il grafico.
+                                              </div>
+                                            )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  };
+                  
+                  export default TeslaChargingCalculator;
+       
