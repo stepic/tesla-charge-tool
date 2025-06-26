@@ -428,7 +428,7 @@ const TeslaChargingCalculator = () => {
                   ]}
                   labelFormatter={(value) => `SOC: ${value}%`}
                 />
-                <Legend />
+                {/* RIMUOVI <Legend /> DA QUI */}
                 <Line 
                   type="monotone" 
                   dataKey="originalPower" 
@@ -469,6 +469,23 @@ const TeslaChargingCalculator = () => {
                 )}
               </LineChart>
             </ResponsiveContainer>
+            {/* Legenda spostata sotto il grafico */}
+            <div className="flex justify-center gap-6 mt-4 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-6 h-1 rounded bg-[#3b82f6]"></span>
+                <span>Potenza Applicata</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-6 h-1 rounded bg-[#94a3b8]" style={{borderBottom: '2px dashed #94a3b8'}}></span>
+                <span>Curva Originale</span>
+              </div>
+              {csvCurveData && csvCurveData.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="inline-block w-6 h-1 rounded bg-[#ef4444]"></span>
+                  <span>Potenza CSV</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Grafico Progresso di Ricarica */}
