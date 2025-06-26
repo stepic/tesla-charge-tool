@@ -47,6 +47,14 @@ const TeslaChargingCalculator = () => {
   const [csvInfo, setCsvInfo] = useState<{minSOC: number, maxSOC: number, maxPower: number} | null>(null);
   const [csvCurveData, setCsvCurveData] = useState<{ soc: number, power: number }[] | null>(null);
 
+  const allowedPowers = [3, 7.4, 11, 15, 20, 22, 45, 50, 60, 75, 90, 250, 300, 320];
+
+  const getClosestAllowedPower = (value: number) => {
+    return allowedPowers.reduce((prev, curr) =>
+      Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev
+    );
+  };
+
   // Parsing CSV e aggiornamento stati
   const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -324,19 +332,27 @@ const TeslaChargingCalculator = () => {
             <div className="flex items-center space-x-3">
               <input
                 type="range"
-                min="1"
-                max="250"
-                value={maxPower}
-                onChange={(e) => setMaxPower(Number(e.target.value))}
+                min={0}
+                max={allowedPowers.length - 1}
+                step={1}
+                value={allowedPowers.findIndex(p => p === maxPower) !== -1 ? allowedPowers.findIndex(p => p === maxPower) : 0}
+                onChange={(e) => {
+                  const idx = Number(e.target.value);
+                  setMaxPower(allowedPowers[idx]);
+                }}
                 className="flex-1 h-2 bg-red-200 rounded-lg appearance-none cursor-pointer"
                 disabled={!!csvInfo}
               />
               <input
                 type="number"
                 value={maxPower}
-                min="1"
-                max="250"
-                onChange={(e) => setMaxPower(Number(e.target.value))}
+                min={Math.min(...allowedPowers)}
+                max={Math.max(...allowedPowers)}
+                step="any"
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setMaxPower(getClosestAllowedPower(val));
+                }}
                 className="text-2xl font-bold text-red-700 min-w-[70px]"
                 style={{ width: 60, marginLeft: 8 }}
                 disabled={!!csvInfo}
@@ -473,7 +489,7 @@ const TeslaChargingCalculator = () => {
                       dataKey="time"
                       domain={[0, calculateChargingTime.totalTimeMinutes]}
                       label={{ value: 'Tempo (min)', angle: -90, position: 'insideLeft' }}
-                      tickFormatter={(value) => value < 60 ? `${Math.round(value)}min` : `${Math.round(value/60)}h`}
+                      tickFormatter={(value) => value < 60 ? `${Math.round(value)}` : `${Math.round(value/60)}h`}
                     />
                     <XAxis
                       type="number"
