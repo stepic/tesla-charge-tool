@@ -1,34 +1,18 @@
 import React, { useState, useMemo } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Area, AreaChart, ReferenceDot } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, AreaChart, ReferenceDot } from 'recharts';
 import { realChargingData } from './realChargingData';
 import Papa from 'papaparse';
 
 document.title = 'Tesla Charging Calculator';
 
-// Funzione di utilità per convertire hh:mm:ss in minuti
-function timeToMinutes(timeStr: string): number {
-  const [h, m, s] = timeStr.split(':').map(Number);
-  return h * 60 + m + s / 60;
-}
-
 // Interpolazione lineare tra due punti dati
-function interpolateField(soc: number, field: keyof typeof realChargingData[0]) {
+function interpolateField(
+  soc: number,
+  field: keyof typeof realChargingData[0] | 'time'
+) {
   const lower = realChargingData.slice().reverse().find((p) => p.soc <= soc);
   const upper = realChargingData.find((p) => p.soc >= soc);
-  if (field === 'time') {
-    // Restituisci sempre minuti
-    if (!lower && upper) return timeToMinutes(upper.time);
-    if (!upper && lower) return timeToMinutes(lower.time);
-    if (lower && upper && lower.soc === upper.soc) return timeToMinutes(lower.time);
-    if (lower && upper) {
-      const ratio = (soc - lower.soc) / (upper.soc - lower.soc);
-      const lowerMin = timeToMinutes(lower.time);
-      const upperMin = timeToMinutes(upper.time);
-      return lowerMin + ratio * (upperMin - lowerMin);
-    }
-    return 0;
-  }
-  // Per altri campi
+
   if (!lower) return upper ? upper[field] : 0;
   if (!upper) return lower[field];
   if (lower.soc === upper.soc) return lower[field];
@@ -43,23 +27,15 @@ const TeslaChargingCalculator = () => {
   const [startSOC, setStartSOC] = useState(20);
   const [endSOC, setEndSOC] = useState(80);
   const [maxPower, setMaxPower] = useState(250);
-  const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvInfo, setCsvInfo] = useState<{minSOC: number, maxSOC: number, maxPower: number} | null>(null);
   const [csvCurveData, setCsvCurveData] = useState<{ soc: number, power: number }[] | null>(null);
 
   const allowedPowers = [3, 7.4, 11, 15, 20, 22, 45, 50, 60, 75, 90, 250, 300, 320];
 
-  const getClosestAllowedPower = (value: number) => {
-    return allowedPowers.reduce((prev, curr) =>
-      Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev
-    );
-  };
-
   // Parsing CSV e aggiornamento stati
   const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setCsvFile(file);
 
     Papa.parse(file, {
       header: true,
@@ -270,7 +246,6 @@ const TeslaChargingCalculator = () => {
               <button
                 className="ml-4 px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition text-xs font-semibold"
                 onClick={() => {
-                  setCsvFile(null);
                   setCsvInfo(null);
                   setCsvCurveData(null);
                 }}
@@ -351,7 +326,7 @@ const TeslaChargingCalculator = () => {
                 step="any"
                 onChange={(e) => {
                   const val = Number(e.target.value);
-                  setMaxPower(getClosestAllowedPower(val));
+                  setMaxPower(val);
                 }}
                 className="text-2xl font-bold text-red-700 min-w-[70px]"
                 style={{ width: 60, marginLeft: 8 }}
@@ -420,13 +395,40 @@ const TeslaChargingCalculator = () => {
                 <YAxis 
                   label={{ value: 'Potenza (kW)', angle: -90, position: 'insideLeft' }}
                 />
-                <Tooltip 
-                  formatter={(value, name) => [
-                    `${(Number(value)).toFixed(1)} kW`, 
-                    name === 'power' ? 'Potenza Limitata' : 
-                    name === 'csvPower' ? 'Potenza CSV' : 'Potenza Originale'
-                  ]}
-                  labelFormatter={(value) => `SOC: ${value}%`}
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload || payload.length === 0) return null;
+                    // Trova i valori di potenza applicata, originale e CSV
+                    const applied = payload.find(p => p.dataKey === "power" && p.stroke === "#3b82f6");
+                    const original = payload.find(p => p.dataKey === "originalPower");
+                    const csv = payload.find(p => p.dataKey === "power" && p.stroke === "#ef4444");
+                    return (
+                      <div className="bg-white rounded-lg shadow-lg px-4 py-2 border border-blue-100">
+                        <div className="font-semibold text-gray-700 mb-1">SOC: {label}%</div>
+                        {original && (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-block w-3 h-3 rounded bg-[#94a3b8]" style={{borderBottom: '2px dashed #94a3b8'}}></span>
+                            <span className="text-gray-500">Potenza originale:</span>
+                            <span className="font-bold text-gray-700">{Number(original.value).toFixed(1)} kW</span>
+                          </div>
+                        )}
+                        {applied && (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-block w-3 h-3 rounded bg-[#3b82f6]"></span>
+                            <span className="text-gray-500">Potenza applicata:</span>
+                            <span className="font-bold text-gray-700">{Number(applied.value).toFixed(1)} kW</span>
+                          </div>
+                        )}
+                        {csv && (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-block w-3 h-3 rounded bg-[#ef4444]"></span>
+                            <span className="text-gray-500">Potenza CSV:</span>
+                            <span className="font-bold text-gray-700">{Number(csv.value).toFixed(1)} kW</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }}
                 />
                 {/* RIMUOVI <Legend /> DA QUI */}
                 <Line 
