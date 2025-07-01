@@ -304,7 +304,7 @@ const TeslaChargingCalculator = () => {
             <label className="block text-sm font-semibold text-gray-700 mb-3">
               Potenza Max (kW)
             </label>
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-3 sm:space-y-0 sm:space-x-3">
               <input
                 type="range"
                 min={0}
@@ -316,6 +316,7 @@ const TeslaChargingCalculator = () => {
                   setMaxPower(allowedPowers[idx]);
                 }}
                 className="flex-1 h-2 bg-red-200 rounded-lg appearance-none cursor-pointer"
+                style={{ touchAction: 'none', minWidth: 0 }}
                 disabled={!!csvInfo}
               />
               <input
@@ -329,8 +330,9 @@ const TeslaChargingCalculator = () => {
                   setMaxPower(val);
                 }}
                 className="text-2xl font-bold text-red-700 min-w-[70px]"
-                style={{ width: 60, marginLeft: 8 }}
+                style={{ width: 80, marginLeft: 0 }}
                 disabled={!!csvInfo}
+                inputMode="decimal"
               />
               <span className="text-2xl font-bold text-red-700 min-w-[70px]">
                 kW
