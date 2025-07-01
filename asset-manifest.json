@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/tesla-charge-tool/static/css/main.dd06aef5.css",
-    "main.js": "/tesla-charge-tool/static/js/main.2107b9c7.js",
+    "main.css": "/tesla-charge-tool/static/css/main.934c61c5.css",
+    "main.js": "/tesla-charge-tool/static/js/main.8d743ccf.js",
     "static/js/453.63e5de49.chunk.js": "/tesla-charge-tool/static/js/453.63e5de49.chunk.js",
     "index.html": "/tesla-charge-tool/index.html",
-    "main.dd06aef5.css.map": "/tesla-charge-tool/static/css/main.dd06aef5.css.map",
-    "main.2107b9c7.js.map": "/tesla-charge-tool/static/js/main.2107b9c7.js.map",
+    "main.934c61c5.css.map": "/tesla-charge-tool/static/css/main.934c61c5.css.map",
+    "main.8d743ccf.js.map": "/tesla-charge-tool/static/js/main.8d743ccf.js.map",
     "453.63e5de49.chunk.js.map": "/tesla-charge-tool/static/js/453.63e5de49.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.dd06aef5.css",
-    "static/js/main.2107b9c7.js"
+    "static/css/main.934c61c5.css",
+    "static/js/main.8d743ccf.js"
   ]
 }
