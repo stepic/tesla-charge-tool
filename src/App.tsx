@@ -41,14 +41,52 @@ const TeslaChargingCalculator = () => {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        const data = results.data as any[];
+        let data: any[] = results.data as any[];
+
+        // Adatta parsing per CSV con intestazioni tipo "SOC [%]", "Power [kW]"
+        // Normalizza le chiavi delle colonne
+        const normalizeKey = (key: string) => {
+          return key
+            .replace(/[\[\]%]/g, '') // rimuove [, ], %
+            .replace(/kW/gi, '') // rimuove kW
+            .replace(/soc/gi, 'soc')
+            .replace(/power/gi, 'power')
+            .replace(/potenza/gi, 'power')
+            .replace(/\s+/g, '')
+            .toLowerCase();
+        };
+
+        // Se la prima riga non ha intestazioni (header: true non trova le colonne), crea oggetti manualmente
+        if (
+          data.length > 0 &&
+          Object.keys(data[0]).length === 2 &&
+          Object.keys(data[0])[0].startsWith('SOC')
+        ) {
+          // PapaParse ha già fatto header: true, ma le chiavi sono tipo "SOC [%]", "Power [kW]"
+          // Normalizza le chiavi
+          data = data.map(row => {
+            const out: any = {};
+            Object.entries(row).forEach(([k, v]) => {
+              out[normalizeKey(k)] = v;
+            });
+            return out;
+          });
+        } else if (
+          data.length > 0 &&
+          Object.keys(data[0]).length === 2 &&
+          Object.keys(data[0])[0] === '0'
+        ) {
+          // Caso: header: false, colonne senza intestazione
+          // Non supportato qui, ma si potrebbe aggiungere
+        }
+
         // Estrai SOC e Potenza
         const socs = data.map(row => {
-          const socStr = (row['SOC'] || row['Soc'] || '').replace('%','').trim();
+          const socStr = (row['soc'] || row['Soc'] || row['SOC'] || '').toString().replace('%','').trim();
           return Number(socStr);
         }).filter(n => !isNaN(n));
         const powers = data.map(row => {
-          const pStr = (row['Power'] || row['Potenza'] || '').replace('kW','').replace(',','.').trim();
+          const pStr = (row['power'] || row['Power'] || row['potenza'] || '').toString().replace('kW','').replace(',','.').trim();
           return Number(pStr);
         }).filter(n => !isNaN(n));
         if (socs.length && powers.length) {
@@ -61,8 +99,8 @@ const TeslaChargingCalculator = () => {
           setCsvInfo({minSOC, maxSOC, maxPower: Math.round(maxPwr)});
           // Prepara dati per curva CSV
           const csvData = data.map(row => {
-            const soc = Number((row['SOC'] || row['Soc'] || '').replace('%','').trim());
-            const power = Number((row['Power'] || row['Potenza'] || '').replace('kW','').replace(',','.').trim());
+            const soc = Number((row['soc'] || row['Soc'] || row['SOC'] || '').toString().replace('%','').trim());
+            const power = Number((row['power'] || row['Power'] || row['potenza'] || '').toString().replace('kW','').replace(',','.').trim());
             return (!isNaN(soc) && !isNaN(power)) ? { soc, power } : null;
           }).filter(Boolean) as { soc: number, power: number }[];
           setCsvCurveData(csvData);
@@ -217,7 +255,7 @@ const TeslaChargingCalculator = () => {
       <div className="bg-white rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
-            🚗⚡ Tesla Model Y Juniper AWD
+            Tesla Model Y⚡
           </h1>
           <p className="text-xl text-gray-600">Calcolatore Tempo di Ricarica</p>
           <p className="text-sm text-gray-500 mt-2">Basato su dati reali di ricarica</p>
@@ -271,8 +309,9 @@ const TeslaChargingCalculator = () => {
                 max="99"
                 value={startSOC}
                 onChange={(e) => setStartSOC(Number(e.target.value))}
-                className="flex-1 h-2 bg-green-200 rounded-lg appearance-none cursor-pointer"
+                className="flex-1 h-2 bg-green-200 rounded-lg appearance-none cursor-pointer touch-manipulation"
                 disabled={!!csvInfo}
+                style={{ touchAction: 'manipulation' }}
               />
               <span className="text-2xl font-bold text-green-700 min-w-[60px]">
                 {startSOC}%
@@ -291,8 +330,9 @@ const TeslaChargingCalculator = () => {
                 max="100"
                 value={endSOC}
                 onChange={(e) => setEndSOC(Number(e.target.value))}
-                className="flex-1 h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer"
+                className="flex-1 h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer touch-manipulation"
                 disabled={!!csvInfo}
+                style={{ touchAction: 'manipulation' }}
               />
               <span className="text-2xl font-bold text-blue-700 min-w-[60px]">
                 {endSOC}%
@@ -300,43 +340,66 @@ const TeslaChargingCalculator = () => {
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-red-50 to-red-100 p-6 rounded-xl">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
+          <div className="bg-gradient-to-r from-red-50 to-red-100 p-6 rounded-xl flex flex-col items-center justify-center">
+            <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">
               Potenza Max (kW)
             </label>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-3 sm:space-y-0 sm:space-x-3">
-              <input
-                type="range"
-                min={0}
-                max={allowedPowers.length - 1}
-                step={1}
-                value={allowedPowers.findIndex(p => p === maxPower) !== -1 ? allowedPowers.findIndex(p => p === maxPower) : 0}
-                onChange={(e) => {
-                  const idx = Number(e.target.value);
-                  setMaxPower(allowedPowers[idx]);
+            <div
+              className="
+                flex
+                flex-row
+                items-center
+                space-x-2
+                sm:space-x-3
+                justify-center
+              "
+            >
+              <button
+                type="button"
+                className="px-3 py-1 bg-red-200 text-red-700 rounded-l font-bold text-2xl hover:bg-red-300 transition"
+                onClick={() => {
+                  const idx = allowedPowers.findIndex(p => p === maxPower);
+                  if (idx > 0) setMaxPower(allowedPowers[idx - 1]);
                 }}
-                className="flex-1 h-2 bg-red-200 rounded-lg appearance-none cursor-pointer"
-                style={{ touchAction: 'none', minWidth: 0 }}
-                disabled={!!csvInfo}
-              />
-              <input
-                type="number"
-                value={maxPower}
-                min={Math.min(...allowedPowers)}
-                max={Math.max(...allowedPowers)}
-                step="any"
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  setMaxPower(val);
+                disabled={!!csvInfo || allowedPowers.findIndex(p => p === maxPower) <= 0}
+                aria-label="Diminuisci potenza"
+              >
+                −
+              </button>
+              <div className="flex flex-row items-center space-x-1">
+                <input
+                  type="number"
+                  value={maxPower}
+                  min={Math.min(...allowedPowers)}
+                  max={Math.max(...allowedPowers)}
+                  step="any"
+                  onChange={(e) => {
+                    // Se il campo è vuoto, non aggiornare subito lo stato
+                    if (e.target.value === "") {
+                      setMaxPower(NaN);
+                    } else {
+                      const val = Number(e.target.value);
+                      setMaxPower(val);
+                    }
+                  }}
+                  className="text-2xl font-bold text-red-700 min-w-[70px] text-center"
+                  style={{ width: 80, marginLeft: 0, marginRight: 0 }}
+                  disabled={!!csvInfo}
+                  inputMode="decimal"
+                />
+              </div>
+              <button
+                type="button"
+                className="px-3 py-1 bg-red-200 text-red-700 rounded-r font-bold text-2xl hover:bg-red-300 transition"
+                onClick={() => {
+                  const idx = allowedPowers.findIndex(p => p === maxPower);
+                  if (idx < allowedPowers.length - 1) setMaxPower(allowedPowers[idx + 1]);
                 }}
-                className="text-2xl font-bold text-red-700 min-w-[70px]"
-                style={{ width: 80, marginLeft: 0 }}
-                disabled={!!csvInfo}
-                inputMode="decimal"
-              />
-              <span className="text-2xl font-bold text-red-700 min-w-[70px]">
-                kW
-              </span>
+                disabled={!!csvInfo || allowedPowers.findIndex(p => p === maxPower) === allowedPowers.length - 1}
+                aria-label="Aumenta potenza"
+              >
+                +
+              </button>
             </div>
           </div>
         </div>
