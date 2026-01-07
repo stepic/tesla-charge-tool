@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, AreaChart, ReferenceDot } from 'recharts';
 import { realChargingData } from './realChargingData';
 import Papa from 'papaparse';
+import { applyTemperatureCorrection, BatteryChemistry, getTemperatureMultiplier } from './temperatureCorrection';
 
 document.title = 'Tesla Charging Calculator';
 
@@ -27,10 +28,38 @@ const TeslaChargingCalculator = () => {
   const [startSOC, setStartSOC] = useState(20);
   const [endSOC, setEndSOC] = useState(80);
   const [maxPower, setMaxPower] = useState(250);
+  const [temperatureC, setTemperatureC] = useState(20);
+  const [chemistry, setChemistry] = useState<BatteryChemistry>('NMC');
+  const [isPreheated, setIsPreheated] = useState(false);
   const [csvInfo, setCsvInfo] = useState<{minSOC: number, maxSOC: number, maxPower: number} | null>(null);
   const [csvCurveData, setCsvCurveData] = useState<{ soc: number, power: number }[] | null>(null);
 
   const allowedPowers = [3, 7.4, 11, 15, 20, 22, 45, 50, 60, 75, 90, 250, 300, 320];
+  const safeTemperatureC = Number.isFinite(temperatureC) ? temperatureC : 20;
+  const temperatureMultiplier = getTemperatureMultiplier(safeTemperatureC, chemistry, isPreheated);
+  const sortedCsvCurveData = useMemo(() => {
+    if (!csvCurveData || csvCurveData.length === 0) return null;
+    return [...csvCurveData].sort((a, b) => a.soc - b.soc);
+  }, [csvCurveData]);
+
+  const getBasePowerAtSoc = (soc: number) => {
+    if (sortedCsvCurveData && sortedCsvCurveData.length > 0) {
+      const first = sortedCsvCurveData[0];
+      const last = sortedCsvCurveData[sortedCsvCurveData.length - 1];
+      if (soc <= first.soc) return first.power;
+      if (soc >= last.soc) return last.power;
+      for (let i = 0; i < sortedCsvCurveData.length - 1; i += 1) {
+        const lower = sortedCsvCurveData[i];
+        const upper = sortedCsvCurveData[i + 1];
+        if (soc >= lower.soc && soc <= upper.soc) {
+          const ratio = (soc - lower.soc) / (upper.soc - lower.soc);
+          return lower.power + ratio * (upper.power - lower.power);
+        }
+      }
+    }
+
+    return interpolateField(soc, 'avgPower') as number;
+  };
 
   // Parsing CSV e aggiornamento stati
   const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,19 +140,11 @@ const TeslaChargingCalculator = () => {
 
   // Interpolazione lineare per ottenere la potenza a qualsiasi SOC
   const interpolatePower = (soc) => {
-    // Trova i due punti più vicini
-    const lowerPoint = realChargingData.slice().reverse().find(point => point.soc <= soc);
-    const upperPoint = realChargingData.find(point => point.soc >= soc);
-    
-    if (!lowerPoint) return Math.min(maxPower, realChargingData[0].avgPower);
-    if (!upperPoint) return Math.min(maxPower, realChargingData[realChargingData.length - 1].avgPower);
-    if (lowerPoint.soc === upperPoint.soc) return Math.min(maxPower, lowerPoint.avgPower);
-    
-    // Interpolazione lineare
-    const ratio = (soc - lowerPoint.soc) / (upperPoint.soc - lowerPoint.soc);
-    const interpolatedPower = lowerPoint.avgPower + ratio * (upperPoint.avgPower - lowerPoint.avgPower);
-    
-    return Math.min(maxPower, interpolatedPower);
+    const basePower = getBasePowerAtSoc(soc);
+    return Math.min(
+      maxPower,
+      applyTemperatureCorrection(basePower, safeTemperatureC, chemistry, isPreheated)
+    );
   };
 
   // Calcolo del tempo di ricarica e profilo usando i dati reali
@@ -137,8 +158,9 @@ const TeslaChargingCalculator = () => {
     for (let soc = startSOC + 1; soc <= endSOC; soc += 1) {
       const currEnergy = interpolateField(soc, 'energy') as number;
       const energyStep = currEnergy - prevEnergy; // kWh da caricare in questo step
-      let power = interpolateField(soc, 'avgPower') as number;
-      power = Math.min(power, maxPower); // limita la potenza
+      const basePower = getBasePowerAtSoc(soc);
+      const correctedPower = applyTemperatureCorrection(basePower, safeTemperatureC, chemistry, isPreheated);
+      const power = Math.min(correctedPower, maxPower); // limita la potenza
       const timeStep = power > 0 ? (energyStep / power) * 60 : 0; // minuti
       totalTime += timeStep;
       chargingProfile.push({
@@ -153,7 +175,10 @@ const TeslaChargingCalculator = () => {
     chargingProfile.unshift({
       soc: Math.round(startSOC),
       time: 0,
-      power: Math.min(interpolateField(startSOC, 'avgPower') as number, maxPower),
+      power: Math.min(
+        applyTemperatureCorrection(getBasePowerAtSoc(startSOC), safeTemperatureC, chemistry, isPreheated),
+        maxPower
+      ),
       timeHours: 0
     });
 
@@ -164,7 +189,12 @@ const TeslaChargingCalculator = () => {
     for (let soc = startSOC + 1; soc <= endSOC; soc += 1) {
       const currEnergy = interpolateField(soc, 'energy') as number;
       const energyStep = currEnergy - prevEnergyMax;
-      let power = interpolateField(soc, 'avgPower') as number;
+      const power = applyTemperatureCorrection(
+        getBasePowerAtSoc(soc),
+        safeTemperatureC,
+        chemistry,
+        isPreheated
+      );
       const timeStep = power > 0 ? (energyStep / power) * 60 : 0;
       totalTimeMax += timeStep;
       chargingProfileMaxPower.push({
@@ -178,7 +208,12 @@ const TeslaChargingCalculator = () => {
     chargingProfileMaxPower.unshift({
       soc: Math.round(startSOC),
       time: 0,
-      power: interpolateField(startSOC, 'avgPower') as number,
+      power: applyTemperatureCorrection(
+        getBasePowerAtSoc(startSOC),
+        safeTemperatureC,
+        chemistry,
+        isPreheated
+      ),
       timeHours: 0
     });
 
@@ -228,7 +263,7 @@ const TeslaChargingCalculator = () => {
       combinedProfile,
       energyAdded
     };
-  }, [startSOC, endSOC, maxPower]);
+  }, [startSOC, endSOC, maxPower, temperatureC, chemistry, isPreheated, sortedCsvCurveData]);
 
   // Formatta il tempo
   const formatTime = (minutes) => {
@@ -242,13 +277,45 @@ const TeslaChargingCalculator = () => {
   };
 
   // Dati per il grafico della curva di potenza (limitati all'intervallo selezionato)
-  const powerCurveData = realChargingData
-    .filter(point => point.soc >= startSOC && point.soc <= endSOC)
-    .map(point => ({
-      soc: point.soc,
-      power: Math.min(maxPower, point.avgPower),
-      originalPower: point.avgPower
-    }));
+  const powerCurveData = (() => {
+    const dataSource = sortedCsvCurveData && sortedCsvCurveData.length > 0
+      ? sortedCsvCurveData
+      : realChargingData.map(point => ({ soc: point.soc, power: point.avgPower }));
+    const minSoc = Math.max(0, Math.floor(startSOC));
+    const maxSoc = Math.min(100, Math.ceil(endSOC));
+
+    const points: { soc: number; power: number; originalPower: number }[] = [];
+    for (let soc = minSoc; soc <= maxSoc; soc += 1) {
+      const basePower = getBasePowerAtSoc(soc);
+      points.push({
+        soc,
+        power: Math.min(
+          maxPower,
+          applyTemperatureCorrection(basePower, safeTemperatureC, chemistry, isPreheated)
+        ),
+        originalPower: basePower
+      });
+    }
+
+    if (points.length === 0 && dataSource.length > 0) {
+      const fallback = dataSource
+        .filter(point => point.soc >= startSOC && point.soc <= endSOC)
+        .map(point => {
+          const basePower = point.power;
+          return {
+            soc: point.soc,
+            power: Math.min(
+              maxPower,
+              applyTemperatureCorrection(basePower, safeTemperatureC, chemistry, isPreheated)
+            ),
+            originalPower: basePower
+          };
+        });
+      return fallback;
+    }
+
+    return points;
+  })();
 
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
@@ -338,6 +405,60 @@ const TeslaChargingCalculator = () => {
                 {endSOC}%
               </span>
             </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-amber-50 to-yellow-100 p-6 rounded-xl text-center">
+            <label className="block text-sm font-semibold text-gray-700 mb-3">
+              Temperatura Esterna (°C)
+            </label>
+            <div className="flex items-center justify-center space-x-3">
+              <input
+                type="number"
+                value={Number.isFinite(temperatureC) ? temperatureC : ''}
+                step="1"
+                onChange={(e) => {
+                  if (e.target.value === "") {
+                    setTemperatureC(NaN);
+                  } else {
+                    setTemperatureC(Number(e.target.value));
+                  }
+                }}
+                className="text-2xl font-bold text-amber-700 min-w-[70px] text-center bg-white"
+                style={{ width: 90 }}
+                inputMode="numeric"
+              />
+              <span className="text-sm text-gray-600">°C</span>
+            </div>
+            <div className="text-xs text-amber-700 mt-2">
+              Moltiplicatore: {temperatureMultiplier.toFixed(2)}x
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-6 rounded-xl text-center">
+            <label className="block text-sm font-semibold text-gray-700 mb-3">
+              Chimica Batteria
+            </label>
+            <div className="flex items-center justify-center space-x-3">
+              <select
+                value={chemistry}
+                onChange={(e) => setChemistry(e.target.value as BatteryChemistry)}
+                className="w-full max-w-[200px] text-base font-semibold text-slate-700 bg-white border border-slate-200 rounded-md px-3 py-2"
+              >
+                <option value="NMC">NMC</option>
+                <option value="NCA">NCA</option>
+                <option value="LFP">LFP</option>
+                <option value="UNKNOWN">UNKNOWN</option>
+              </select>
+            </div>
+            <label className="flex items-center justify-center gap-2 mt-3 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={isPreheated}
+                onChange={(e) => setIsPreheated(e.target.checked)}
+                className="accent-slate-600"
+              />
+              Batteria preriscaldata
+            </label>
           </div>
 
           <div className="bg-gradient-to-r from-red-50 to-red-100 p-6 rounded-xl flex flex-col items-center justify-center">
