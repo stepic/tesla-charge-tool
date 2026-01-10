@@ -3,6 +3,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { realChargingData } from './realChargingData';
 import Papa from 'papaparse';
 import { applyTemperatureCorrection, BatteryChemistry, getTemperatureMultiplier } from './temperatureCorrection';
+import { useTheme } from './useTheme';
+import { ThemeSwitcher } from './ThemeSwitcher';
 
 document.title = 'Tesla Charging Calculator';
 
@@ -25,6 +27,7 @@ function interpolateField(
 }
 
 const TeslaChargingCalculator = () => {
+  const { theme, setTheme } = useTheme();
   const [startSOC, setStartSOC] = useState(20);
   const [endSOC, setEndSOC] = useState(80);
   const [maxPower, setMaxPower] = useState(250);
@@ -318,21 +321,24 @@ const TeslaChargingCalculator = () => {
   })();
 
   return (
-    <div className="max-w-7xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
-      <div className="bg-white rounded-2xl shadow-xl p-8">
+    <div className="max-w-7xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 min-h-screen transition-colors">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 transition-colors">
+        <div className="absolute top-8 right-8">
+          <ThemeSwitcher theme={theme} onThemeChange={setTheme} />
+        </div>
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">
+          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-2">
             Tesla Model Y⚡
           </h1>
-          <p className="text-xl text-gray-600">Calcolatore Tempo di Ricarica</p>
-          <p className="text-sm text-gray-500 mt-2">Basato su dati reali di ricarica</p>
+          <p className="text-xl text-gray-600 dark:text-gray-300">Calcolatore Tempo di Ricarica</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Basato su dati reali di ricarica</p>
         </div>
 
         {/* Upload CSV migliorato */}
         <div className="flex flex-col items-center mb-10">
           <label
             htmlFor="csv-upload"
-            className="cursor-pointer px-6 py-3 rounded-lg bg-gradient-to-r from-blue-400 to-indigo-500 text-white font-semibold shadow-md hover:from-blue-500 hover:to-indigo-600 transition mb-2"
+            className="cursor-pointer px-6 py-3 rounded-lg bg-gradient-to-r from-blue-400 to-indigo-500 text-white font-semibold shadow-md hover:from-blue-500 hover:to-indigo-600 dark:from-blue-600 dark:to-indigo-700 dark:hover:from-blue-700 dark:hover:to-indigo-800 transition mb-2"
           >
             📄 Carica file CSV di ricarica
           </label>
@@ -344,12 +350,12 @@ const TeslaChargingCalculator = () => {
             className="hidden"
           />
           {csvInfo && (
-            <div className="text-sm text-gray-700 mt-2 bg-blue-50 px-4 py-2 rounded-lg shadow-inner">
+            <div className="text-sm text-gray-700 dark:text-gray-200 mt-2 bg-blue-50 dark:bg-blue-900/30 dark:border dark:border-blue-800 px-4 py-2 rounded-lg shadow-inner transition-colors">
               <span className="mr-2">SOC rilevati: <b>{csvInfo.minSOC}%</b> - <b>{csvInfo.maxSOC}%</b></span>
               <span className="mx-2">|</span>
               <span>Potenza max: <b>{csvInfo.maxPower} kW</b></span>
               <button
-                className="ml-4 px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition text-xs font-semibold"
+                className="ml-4 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition text-xs font-semibold"
                 onClick={() => {
                   setCsvInfo(null);
                   setCsvCurveData(null);
@@ -359,14 +365,14 @@ const TeslaChargingCalculator = () => {
               </button>
             </div>
           )}
-          <div className="text-xs text-gray-400 mt-1">Accetta file CSV con colonne SOC e Power/Potenza</div>
+          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">Accetta file CSV con colonne SOC e Power/Potenza</div>
         </div>
         {/* Fine upload CSV migliorato */}
 
         {/* Controlli */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-gradient-to-r from-green-50 to-green-100 p-6 rounded-xl">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
+          <div className="bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 dark:border dark:border-green-700 p-6 rounded-xl transition-colors">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
               SOC Iniziale
             </label>
             <div className="flex items-center space-x-3">
@@ -376,18 +382,18 @@ const TeslaChargingCalculator = () => {
                 max="99"
                 value={startSOC}
                 onChange={(e) => setStartSOC(Number(e.target.value))}
-                className="flex-1 h-2 bg-green-200 rounded-lg appearance-none cursor-pointer touch-manipulation"
+                className="flex-1 h-2 bg-green-200 dark:bg-green-700 rounded-lg appearance-none cursor-pointer touch-manipulation"
                 disabled={!!csvInfo}
                 style={{ touchAction: 'manipulation' }}
               />
-              <span className="text-2xl font-bold text-green-700 min-w-[60px]">
+              <span className="text-2xl font-bold text-green-700 dark:text-green-400 min-w-[60px]">
                 {startSOC}%
               </span>
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-xl">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 dark:border dark:border-blue-700 p-6 rounded-xl transition-colors">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
               SOC Finale
             </label>
             <div className="flex items-center space-x-3">
@@ -397,18 +403,18 @@ const TeslaChargingCalculator = () => {
                 max="100"
                 value={endSOC}
                 onChange={(e) => setEndSOC(Number(e.target.value))}
-                className="flex-1 h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer touch-manipulation"
+                className="flex-1 h-2 bg-blue-200 dark:bg-blue-700 rounded-lg appearance-none cursor-pointer touch-manipulation"
                 disabled={!!csvInfo}
                 style={{ touchAction: 'manipulation' }}
               />
-              <span className="text-2xl font-bold text-blue-700 min-w-[60px]">
+              <span className="text-2xl font-bold text-blue-700 dark:text-blue-400 min-w-[60px]">
                 {endSOC}%
               </span>
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-amber-50 to-yellow-100 p-6 rounded-xl text-center">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
+          <div className="bg-gradient-to-r from-amber-50 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-800/30 dark:border dark:border-amber-700 p-6 rounded-xl text-center transition-colors">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
               Temperatura Esterna (°C)
             </label>
             <div className="flex items-center justify-center space-x-3">
@@ -423,26 +429,26 @@ const TeslaChargingCalculator = () => {
                     setTemperatureC(Number(e.target.value));
                   }
                 }}
-                className="text-2xl font-bold text-amber-700 min-w-[70px] text-center bg-white"
+                className="text-2xl font-bold text-amber-700 dark:text-amber-400 min-w-[70px] text-center bg-white dark:bg-gray-700 dark:border dark:border-gray-600"
                 style={{ width: 90 }}
                 inputMode="numeric"
               />
-              <span className="text-sm text-gray-600">°C</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">°C</span>
             </div>
-            <div className="text-xs text-amber-700 mt-2">
+            <div className="text-xs text-amber-700 dark:text-amber-400 mt-2">
               Moltiplicatore: {temperatureMultiplier.toFixed(2)}x
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-6 rounded-xl text-center">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
+          <div className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800/30 dark:to-slate-700/30 dark:border dark:border-slate-600 p-6 rounded-xl text-center transition-colors">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
               Chimica Batteria
             </label>
             <div className="flex items-center justify-center space-x-3">
               <select
                 value={chemistry}
                 onChange={(e) => setChemistry(e.target.value as BatteryChemistry)}
-                className="w-full max-w-[200px] text-base font-semibold text-slate-700 bg-white border border-slate-200 rounded-md px-3 py-2"
+                className="w-full max-w-[200px] text-base font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-700 border border-slate-200 dark:border-slate-600 rounded-md px-3 py-2"
               >
                 <option value="NMC">NMC</option>
                 <option value="NCA">NCA</option>
@@ -450,19 +456,19 @@ const TeslaChargingCalculator = () => {
                 <option value="UNKNOWN">UNKNOWN</option>
               </select>
             </div>
-            <label className="flex items-center justify-center gap-2 mt-3 text-sm text-slate-600">
+            <label className="flex items-center justify-center gap-2 mt-3 text-sm text-slate-600 dark:text-slate-400">
               <input
                 type="checkbox"
                 checked={isPreheated}
                 onChange={(e) => setIsPreheated(e.target.checked)}
-                className="accent-slate-600"
+                className="accent-slate-600 dark:accent-slate-400"
               />
               Batteria preriscaldata
             </label>
           </div>
 
-          <div className="bg-gradient-to-r from-red-50 to-red-100 p-6 rounded-xl flex flex-col items-center justify-center">
-            <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">
+          <div className="bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/30 dark:border dark:border-red-700 p-6 rounded-xl flex flex-col items-center justify-center transition-colors">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 text-center">
               Potenza Max (kW)
             </label>
             <div
@@ -477,7 +483,7 @@ const TeslaChargingCalculator = () => {
             >
               <button
                 type="button"
-                className="px-3 py-1 bg-red-200 text-red-700 rounded-l font-bold text-2xl hover:bg-red-300 transition"
+                className="px-3 py-1 bg-red-200 dark:bg-red-900/50 text-red-700 dark:text-red-400 rounded-l font-bold text-2xl hover:bg-red-300 dark:hover:bg-red-900/70 transition"
                 onClick={() => {
                   const idx = allowedPowers.findIndex(p => p === maxPower);
                   if (idx > 0) setMaxPower(allowedPowers[idx - 1]);
@@ -503,7 +509,7 @@ const TeslaChargingCalculator = () => {
                       setMaxPower(val);
                     }
                   }}
-                  className="text-2xl font-bold text-red-700 min-w-[70px] text-center"
+                  className="text-2xl font-bold text-red-700 dark:text-red-400 min-w-[70px] text-center bg-white dark:bg-gray-700 dark:border dark:border-gray-600"
                   style={{ width: 80, marginLeft: 0, marginRight: 0 }}
                   disabled={!!csvInfo}
                   inputMode="decimal"
@@ -511,7 +517,7 @@ const TeslaChargingCalculator = () => {
               </div>
               <button
                 type="button"
-                className="px-3 py-1 bg-red-200 text-red-700 rounded-r font-bold text-2xl hover:bg-red-300 transition"
+                className="px-3 py-1 bg-red-200 dark:bg-red-900/50 text-red-700 dark:text-red-400 rounded-r font-bold text-2xl hover:bg-red-300 dark:hover:bg-red-900/70 transition"
                 onClick={() => {
                   const idx = allowedPowers.findIndex(p => p === maxPower);
                   if (idx < allowedPowers.length - 1) setMaxPower(allowedPowers[idx + 1]);
@@ -528,25 +534,25 @@ const TeslaChargingCalculator = () => {
         {/* Risultati */}
         {calculateChargingTime && startSOC < endSOC && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-6 rounded-xl text-center">
+            <div className="bg-gradient-to-r from-purple-500 to-pink-500 dark:from-purple-700 dark:to-pink-700 text-white p-6 rounded-xl text-center shadow-lg">
               <div className="text-3xl font-bold mb-1">
                 {formatTime(calculateChargingTime.totalTimeMinutes)}
               </div>
               <div className="text-sm opacity-90">Tempo Totale</div>
             </div>
-            <div className="bg-gradient-to-r from-green-500 to-teal-500 text-white p-6 rounded-xl text-center">
+            <div className="bg-gradient-to-r from-green-500 to-teal-500 dark:from-green-700 dark:to-teal-700 text-white p-6 rounded-xl text-center shadow-lg">
               <div className="text-3xl font-bold mb-1">
                 {(endSOC - startSOC)}%
               </div>
               <div className="text-sm opacity-90">Carica Aggiunta</div>
             </div>
-            <div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white p-6 rounded-xl text-center">
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-700 dark:to-indigo-700 text-white p-6 rounded-xl text-center shadow-lg">
               <div className="text-3xl font-bold mb-1">
                 {calculateChargingTime.energyAdded.toFixed(1)} kWh
               </div>
               <div className="text-sm opacity-90">kWh Caricati</div>
             </div>
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-6 rounded-xl text-center">
+            <div className="bg-gradient-to-r from-orange-500 to-red-500 dark:from-orange-700 dark:to-red-700 text-white p-6 rounded-xl text-center shadow-lg">
               <div className="text-3xl font-bold mb-1">
                 {interpolatePower(startSOC).toFixed(0)} kW
               </div>
@@ -557,7 +563,7 @@ const TeslaChargingCalculator = () => {
 
         {/* Errore se SOC non valido */}
         {startSOC >= endSOC && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
+          <div className="bg-red-100 dark:bg-red-900/30 dark:border-red-700 border border-red-400 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg mb-6">
             <strong>Attenzione:</strong> Il SOC iniziale deve essere inferiore al SOC finale.
           </div>
         )}
@@ -565,8 +571,8 @@ const TeslaChargingCalculator = () => {
         {/* Grafici */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Grafico Curva di Potenza */}
-          <div className="bg-gray-50 p-6 rounded-xl">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4 text-center">
+          <div className="bg-gray-50 dark:bg-gray-700/50 dark:border dark:border-gray-600 p-6 rounded-xl transition-colors">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4 text-center">
               📊 Curva di Ricarica - Potenza vs SOC
             </h3>
             <ResponsiveContainer width="100%" height={300}>
@@ -577,9 +583,11 @@ const TeslaChargingCalculator = () => {
                   domain={[startSOC, endSOC]}
                   type="number"
                   label={{ value: 'SOC (%)', position: 'insideBottom', offset: -5 }}
+                  stroke="#6b7280"
                 />
                 <YAxis 
                   label={{ value: 'Potenza (kW)', angle: -90, position: 'insideLeft' }}
+                  stroke="#6b7280"
                 />
                 <Tooltip
                   content={({ active, payload, label }) => {
@@ -589,8 +597,8 @@ const TeslaChargingCalculator = () => {
                     const original = payload.find(p => p.dataKey === "originalPower");
                     const csv = payload.find(p => p.dataKey === "power" && p.stroke === "#ef4444");
                     return (
-                      <div className="bg-white rounded-lg shadow-lg px-4 py-2 border border-blue-100">
-                        <div className="font-semibold text-gray-700 mb-1">SOC: {label}%</div>
+                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg px-4 py-2 border border-blue-100 dark:border-gray-600">
+                        <div className="font-semibold text-gray-700 dark:text-gray-200 mb-1">SOC: {label}%</div>
                         {original && (
                           <div className="flex items-center gap-2">
                             <span className="inline-block w-3 h-3 rounded bg-[#94a3b8]" style={{borderBottom: '2px dashed #94a3b8'}}></span>
@@ -658,7 +666,7 @@ const TeslaChargingCalculator = () => {
               </LineChart>
             </ResponsiveContainer>
             {/* Legenda spostata sotto il grafico */}
-            <div className="flex justify-center gap-6 mt-4 text-sm">
+            <div className="flex justify-center gap-6 mt-4 text-sm text-gray-700 dark:text-gray-300">
               <div className="flex items-center gap-2">
                 <span className="inline-block w-6 h-1 rounded bg-[#3b82f6]"></span>
                 <span>Potenza Applicata</span>
@@ -677,8 +685,8 @@ const TeslaChargingCalculator = () => {
           </div>
 
           {/* Grafico Progresso di Ricarica */}
-          <div className="bg-gray-50 p-6 rounded-xl">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4 text-center">
+          <div className="bg-gray-50 dark:bg-gray-700/50 dark:border dark:border-gray-600 p-6 rounded-xl transition-colors">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4 text-center">
               ⏱️ Progresso di Ricarica - SOC vs Tempo
             </h3>
             {calculateChargingTime && startSOC < endSOC ? (
@@ -796,7 +804,7 @@ const TeslaChargingCalculator = () => {
                   </AreaChart>
                 </ResponsiveContainer>
                 {/* Legenda custom */}
-                <div className="flex justify-center gap-6 mt-4 text-sm">
+                <div className="flex justify-center gap-6 mt-4 text-sm text-gray-700 dark:text-gray-300">
                   <div className="flex items-center gap-2">
                     <span className="inline-block w-6 h-1 rounded bg-[#8b5cf6]"></span>
                     <span>SOC potenza selezionata</span>
@@ -808,7 +816,7 @@ const TeslaChargingCalculator = () => {
                 </div>
               </>
             ) : (
-              <div className="text-center text-gray-400 py-16">
+              <div className="text-center text-gray-400 dark:text-gray-500 py-16">
                 Seleziona un intervallo di SOC valido per vedere il grafico.
               </div>
             )}
